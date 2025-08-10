@@ -84,20 +84,29 @@ def main():
                             
 
                             # Add schedules
-                            for show_time in show_times:
-                                schedule_query = """
-                                INSERT INTO schedule (show_time, show_date, movie_id) 
-                                VALUES (%s, %s, %s)
-                                """
-                                execute_update(schedule_query, (show_time, release_date, movie_id))
+                            current_date = release_date
                                 
-                                # Add to movie_played_on_schedule
+                            while current_date <= screen_till:
+                                for show_time in show_times:
+                                    # Use INSERT IGNORE to skip duplicates
+                                    schedule_query = """
+                                    INSERT IGNORE INTO schedule (show_time, show_date, movie_id) 
+                                    VALUES (%s, %s, %s)
+                                    """
+                                    execute_update(schedule_query, (show_time, current_date, movie_id))
+                                
+                                # Move to next date
+                                current_date += datetime.timedelta(days=1)
+                            
+                            # Add to movie_played_on_schedule using INSERT IGNORE
+                            for show_time in show_times:
                                 movie_schedule_query = """
-                                INSERT INTO movie_played_on_schedule (show_time, movie_id) 
+                                INSERT IGNORE INTO movie_played_on_schedule (show_time, movie_id) 
                                 VALUES (%s, %s)
                                 """
                                 execute_update(movie_schedule_query, (show_time, movie_id))
-                            
+                                
+                                                            
                             st.success(f"Movie '{movie_title}' added successfully!")
                         else:
                             st.error("Failed to retrieve movie ID.")

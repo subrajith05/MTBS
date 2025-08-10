@@ -97,7 +97,7 @@ def main():
             movies.append(movie_obj)
         
         # Filter available movies (those with start_date <= today <= stop_date)
-        available_movies = [movie for movie in movies if movie["start_date"] >= today]
+        available_movies = [movie for movie in movies if movie["stop_date"] and movie["stop_date"] >= today]
         
         if not available_movies:
             st.warning("No movies are currently scheduled for showing.")
@@ -130,11 +130,14 @@ def main():
         st.write(movie["description"])
 
         # Step 3: Date Selection
+        min_date = max(movie["start_date"], today) if movie["start_date"] else today
+        max_date = movie["stop_date"] if movie["stop_date"] else today
+        
         selected_date = st.date_input(
             "📅 Select a Date:",
-            min_value=movie["start_date"],
-            max_value=movie["stop_date"],
-            value=max(movie["start_date"], today)
+            min_value=min_date,
+            max_value=max_date,
+            value=min_date
         )
 
         if selected_date:
@@ -155,28 +158,41 @@ def main():
             actual_times = []
             
             if show_data:
+                current_date = datetime.date.today()
+                current_time = dt.now().time()
+                selected_date = st.session_state["selected_date"]
+                
                 for show in show_data:
-                    t1=show['formatted_time']
-                    t1 = dt.strptime(t1, "%I:%M %p").time()
-                    nows = dt.now().time()
-                    if t1>nows:
+                    show_time_str = show['formatted_time']
+                    show_time_obj = dt.strptime(show_time_str, "%I:%M %p").time()
+                    
+                    # If selected date is in the future, show all times
+                    # If selected date is today, only show times that haven't started yet
+                    if selected_date > current_date or (selected_date == current_date and show_time_obj > current_time):
                         available_shows.append(show['formatted_time'])
                         actual_times.append(show['show_time'])
                 
                 st.markdown(f"### 🎟 Available Shows on {st.session_state['selected_date']}")
-                show_cols = st.columns(len(available_shows))
-                for i, show in enumerate(available_shows):
-                    with show_cols[i]:
-                        if st.button(show, key=f"show_{i}"):
-                            st.session_state["selected_show"] = show
-                            st.session_state["actual_show_time"] = actual_times[i] 
-                            st.session_state["selected_gold_seats"] = []
-                            st.session_state["selected_standard_seats"] = []
-                            st.session_state["num_seats"] = 1 
-                            st.rerun()
+                
+                # Check if available_shows is not empty before creating columns
+                if available_shows:
+                    show_cols = st.columns(len(available_shows))
+                    for i, show in enumerate(available_shows):
+                        with show_cols[i]:
+                            if st.button(show, key=f"show_{i}"):
+                                st.session_state["selected_show"] = show
+                                st.session_state["actual_show_time"] = actual_times[i] 
+                                st.session_state["selected_gold_seats"] = []
+                                st.session_state["selected_standard_seats"] = []
+                                st.session_state["num_seats"] = 1 
+                                st.rerun()
+                else:
+                    if selected_date == current_date:
+                        st.info(f"No shows available for {st.session_state['selected_date']} at this time. All shows for today may have already started.")
+                    else:
+                        st.info(f"No shows scheduled for {st.session_state['selected_date']}.")
             else:
                 st.info(f"No shows scheduled for {st.session_state['selected_date']}. Please select another date.")
-
     # Step 5: Seat Selection
     if "selected_show" in st.session_state and "selected_date" in st.session_state:
         st.markdown(f"## 🎥 Selected Show: {st.session_state['selected_show']} on {st.session_state['selected_date']}")
